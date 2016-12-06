@@ -4,6 +4,7 @@ phases:
   install:
     commands:
       - aws --version
+      - aws s3 sync content/* s3://temp-horse-storage/
 
 artifacts:
   files:
