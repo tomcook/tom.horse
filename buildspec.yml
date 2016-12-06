@@ -1,0 +1,11 @@
+version: 0.1
+
+phases:
+  install:
+    commands:
+      - echo Nothing to do here 
+
+artifacts:
+  files:
+    - content/*
+  discard-paths: yes
