@@ -1,0 +1,28 @@
+html {
+  background:  url('/wavlp.gif') no-repeat center center fixed;
+  background-size: cover;
+
+}
+a {
+  color: black;
+}
+h2 {
+  color: black;
+}
+h3 {
+  color: black;
+}
+body {
+  height: 100%;
+  background: transparent;
+  padding-top: 60px;
+}
+.panel {
+  background-color: rgba(165, 237, 54, 0);
+  margin: 40px;
+  width: 170px;
+  padding-left:10px;
+  padding-bottom:10px;
+  border:0px solid;
+  border-radius:1px;
+}
