@@ -1,0 +1,166 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Horse Publishing Engine
+Parameters:
+  ServiceName:
+    Type: String
+    Description: Name for the service
+    Default: horse
+  ContentBucket:
+    Type: String
+    Description: Where to put the site files
+    Default: tcook-hosted-tom.horse
+  GitHubToken:
+    NoEcho: 'true'
+    Type: String
+    Description: Secret. Looks like an MD5
+  GitHubUser:
+    Type: String
+    Description: GitHub UserName
+    Default: tomcook
+  Repo:
+    Type: String
+    Description: GitHub Repo to pull from. Only the Name. not the URL
+    Default: tom.horse
+  Branch:
+    Type: String
+    Description: Branch to use from Repo. Only the Name. not the URL
+    Default: master
+
+Resources:
+
+  # --------------------
+  # CodeBuild project and resources (S3 Bucket for build artifacts, Role, Project)
+  BuildArtifactsBucket:
+    Type: AWS::S3::Bucket
+
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action:
+              - 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: CodeBuildAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Resource:
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${ServiceName}_build'
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${ServiceName}_build:*'
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+              - Effect: Allow
+                Resource:
+                  - !Sub 'arn:aws:s3:::${BuildArtifactsBucket}/*'
+                  - !Sub 'arn:aws:s3:::${ContentBucket}/*'
+                  - !Sub 'arn:aws:s3:::${ContentBucket}'
+                Action:
+                  - 's3:GetObject'
+                  - 's3:GetObjectVersion'
+                  - 's3:PutObject'
+                  - 's3:List*'
+
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub '${ServiceName}_build'
+      Description: Horse Builder
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/ubuntu-base:14.04
+        EnvironmentVariables:
+          - Name: BUILD_OUTPUT_BUCKET
+            Value: !Ref BuildArtifactsBucket
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Source:
+        Type: CODEPIPELINE
+
+  # --------------------
+  # CodePipeline definition and required roles
+  PipelineExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action:
+            - 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+      Path: /
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+      Policies:
+        - PolicyName: HorsePipeline
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - 'iam:PassRole'
+                  - 'lambda:InvokeFunction'
+                  - 'lambda:ListFunctions'
+                  - 'lambda:InvokeAsyc'
+                  - 'codebuild:StartBuild'
+                  - 'codebuild:BatchGetBuilds'
+                Effect: Allow
+                Resource: '*'
+
+  # --------------------
+  # The Pipeline
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub ${ServiceName}_pipeline
+      ArtifactStore:
+        Location: !Ref BuildArtifactsBucket
+        Type: S3
+      RoleArn: !GetAtt PipelineExecutionRole.Arn
+      Stages:
+
+      - Name: Source
+        Actions:
+        - InputArtifacts: []
+          Name: Source
+          ActionTypeId:
+            Category: Source
+            Owner: ThirdParty
+            Version: '1'
+            Provider: GitHub
+          OutputArtifacts:
+          - Name: SourceZip
+          Configuration:
+            Owner:  !Ref GitHubUser
+            Repo:   !Ref Repo
+            Branch: !Ref Branch
+            OAuthToken: !Ref GitHubToken
+          RunOrder: 1
+
+      - Name: Build
+        Actions:
+          - Name: CodeBuild
+            ActionTypeId:
+              Category: Build
+              Owner: AWS
+              Provider: CodeBuild
+              Version: 1
+            Configuration:
+              ProjectName: !Ref CodeBuildProject
+            InputArtifacts:
+              - Name: SourceZip
+            OutputArtifacts:
+              - Name: BuiltZip
