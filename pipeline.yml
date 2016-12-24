@@ -5,10 +5,9 @@ Parameters:
     Type: String
     Description: Name for the service
     Default: horse
-  ContentBucket:
+  DomainName:
     Type: String
-    Description: Where to put the site files
-    Default: tcook-hosted-tom.horse
+    Description: Domain Name for this hosted site (like cnn.com)
   GitHubToken:
     NoEcho: 'true'
     Type: String
@@ -28,10 +27,24 @@ Parameters:
 
 Resources:
 
+  #
+  # Site content destination
+  ContentBucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName: !Sub "${AWS::AccountId}-hosted-${DomainName}-content"
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+    DeletionPolicy: Retain
+
   # --------------------
   # CodeBuild project and resources (S3 Bucket for build artifacts, Role, Project)
   BuildArtifactsBucket:
     Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::AccountId}-codebuild-${DomainName}-artifacts"
 
   CodeBuildServiceRole:
     Type: AWS::IAM::Role

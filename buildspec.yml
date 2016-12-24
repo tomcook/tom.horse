@@ -4,8 +4,7 @@ phases:
   install:
     commands:
       - aws --version
-      - echo $CONTENT_BUCKET
-      - aws s3 sync content/ s3://tcook-hosted-tom.horse/
+      - aws s3 sync content/ s3://${CONTENT_BUCKET}/
 
 artifacts:
   files:
