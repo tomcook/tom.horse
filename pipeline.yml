@@ -84,6 +84,8 @@ Resources:
         EnvironmentVariables:
           - Name: BUILD_OUTPUT_BUCKET
             Value: !Ref BuildArtifactsBucket
+          - Name: CONTENT_BUCKET
+            Value: !Ref ContentBucket
       ServiceRole: !GetAtt CodeBuildServiceRole.Arn
       Source:
         Type: CODEPIPELINE
